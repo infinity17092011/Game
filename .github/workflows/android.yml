@@ -7,7 +7,6 @@ jobs:
   apk:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -15,16 +14,222 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-      - run: npm install
-      - name: Generate Android project
+      - name: Create project files
         run: |
+          mkdir app && cd app && mkdir www
+          cat > package.json <<'EOF'
+          {"name":"mr-heart","version":"1.0.0","private":true,"dependencies":{"@capacitor/android":"^6.1.2","@capacitor/cli":"^6.1.2","@capacitor/core":"^6.1.2"}}
+          EOF
+          cat > capacitor.config.json <<'EOF'
+          {"appId":"com.wizardgamers.mrheart","appName":"Mr.Heart","webDir":"www","backgroundColor":"#fff1f3"}
+          EOF
+          cat > www/index.html <<'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+          <title>Mr.Heart</title>
+          <style>
+          :root{--bg:#fff1f3;--fg:#4a0d1f;--sky:#ffe3e8;--ground:#7a0f2e;--btn:#e11d48;--btnfg:#fff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+          @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1a0b10;--fg:#ffd9e0;--sky:#2b1119;--ground:#e11d48;--btn:#fb7185;--btnfg:#2b0a12}}
+          *{box-sizing:border-box}
+          html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+          body{display:flex;align-items:center;justify-content:center;padding:6px;overflow:hidden}
+          #wrap{container-type:inline-size;position:relative;width:min(calc(100vw - 12px),calc((100vh - 12px)*2));aspect-ratio:2/1;border-radius:12px;overflow:hidden;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+          canvas{width:100%;height:100%;display:block}
+          #hero{position:absolute;pointer-events:none;width:8%;left:10%;top:0}
+          .scr{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.3cqw;text-align:center;background:var(--sky)}
+          .scr.over{background:rgba(0,0,0,.6);color:#fff}
+          .hide{display:none!important}
+          .btn{background:var(--btn);color:var(--btnfg);border:0;border-radius:1.4cqw;font-weight:700;padding:1.1cqw 3cqw;font-size:2.6cqw;cursor:pointer;font-family:inherit}
+          .btn:disabled{opacity:.35;cursor:default}
+          .ctl{position:absolute;bottom:3%;width:16cqw;height:9cqw;font-size:3cqw;opacity:.7;z-index:3;touch-action:none}
+          #jumpBtn{left:2%}#shootBtn{right:2%}
+          #s1{font-size:4cqw;font-weight:600;opacity:0;transition:opacity .8s}
+          #s2{font-size:12cqw;font-weight:900;color:var(--btn);opacity:0;transform:scale(.6);transition:all .7s}
+          #s1.on,#s2.on{opacity:1;transform:none}
+          h2{margin:0;font-size:5cqw}
+          #grid{display:grid;grid-template-columns:repeat(5,1fr);gap:1.2cqw;width:78cqw}
+          .tile{display:flex;flex-direction:column;align-items:center;padding:1cqw;font-size:2.2cqw}
+          .tile b{font-size:4cqw}
+          .banner{font-size:2.6cqw;font-weight:800;color:var(--btn)}
+          .row{display:flex;gap:2cqw}
+          .sub{font-size:2.6cqw}
+          #rot{display:none;position:fixed;inset:0;z-index:9;background:var(--bg);align-items:center;justify-content:center;text-align:center;padding:24px;font-size:22px;font-weight:700}
+          @media (orientation:portrait){#rot{display:flex}}
+          </style>
+          </head>
+          <body>
+          <div id="wrap">
+            <canvas id="c" width="800" height="400"></canvas>
+            <img id="hero" alt="Mr.Heart running">
+            <button class="btn ctl" id="jumpBtn">Jump</button>
+            <button class="btn ctl" id="shootBtn">Shoot</button>
+            <div class="scr" id="splash"><div id="s1">W!zardG@mers presents</div><div id="s2">Mr.Heart</div></div>
+            <div class="scr hide" id="menu"></div>
+            <div class="scr over hide" id="end"></div>
+          </div>
+          <div id="rot">Rotate your device to landscape to play</div>
+          <script>
+          const $=id=>document.getElementById(id);
+          const cv=$('c'),ctx=cv.getContext('2d'),hero=$('hero');
+          const W=800,H=400,G=340,PW=56,PH=64,PX=80;
+          const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 72"><g stroke="#7a0f2e" stroke-width="5" stroke-linecap="round"><line x1="32" y1="44" x2="32" y2="66"><animateTransform attributeName="transform" type="rotate" values="-35 32 44;35 32 44;-35 32 44" dur="0.5s" repeatCount="indefinite"/></line><line x1="32" y1="44" x2="32" y2="66"><animateTransform attributeName="transform" type="rotate" values="-35 32 44;35 32 44;-35 32 44" dur="0.5s" begin="-0.25s" repeatCount="indefinite"/></line></g><path d="M32 52C10 38 4 26 12 16C19 8 29 12 32 20C35 12 45 8 52 16C60 26 54 40 32 52Z" fill="#e11d48"/><circle cx="26" cy="26" r="3.5" fill="#fff"/><circle cx="40" cy="26" r="3.5" fill="#fff"/><circle cx="27" cy="26" r="1.8" fill="#222"/><circle cx="41" cy="26" r="1.8" fill="#222"/></svg>`;
+          hero.src='data:image/svg+xml,'+encodeURIComponent(svg);
+
+          let sv={hs:{},un:1};
+          try{const s=JSON.parse(localStorage.getItem('mrheart'));if(s)sv=s}catch(e){}
+          const save=()=>{try{localStorage.setItem('mrheart',JSON.stringify(sv))}catch(e){}};
+
+          // 10 levels, each harder; mode -1 = endless
+          const LV=[...Array(10)].map((_,i)=>({speed:5+i*.55,gap:Math.max(52,98-i*5),goal:1100+i*140,hp:Math.min(3,1+Math.floor(i/3)),big:.35+i*.03}));
+
+          let scene='splash',mode=0,p,objs,bullets,spawnT,cd,t,pts,groundX,held=false,kb=false;
+          const score=()=>pts+(t/10|0);
+
+          function show(el){['splash','menu','end'].forEach(i=>$(i).classList.add('hide'));if(el)$(el).classList.remove('hide')}
+
+          // splash
+          setTimeout(()=>$('s1').classList.add('on'),300);
+          setTimeout(()=>{$('s1').classList.remove('on');$('s2').classList.add('on')},2200);
+          setTimeout(()=>{if(scene==='splash')menu()},4600);
+          $('splash').addEventListener('pointerdown',()=>{if(scene==='splash')menu()});
+
+          function menu(){
+            scene='menu';hero.style.visibility='hidden';
+            let h='<h2>Mr.Heart</h2>';
+            if(sv.un>10)h+='<div class="banner">★ COMPLETED! All 10 levels cleared ★</div>';
+            h+='<div id="grid">';
+            for(let i=0;i<10;i++){
+              const lock=i+1>sv.un,done=i+1<sv.un;
+              h+=`<button class="btn tile" ${lock?'disabled':''} onclick="start(${i})"><b>${lock?'🔒':(i+1)+(done?' ✓':'')}</b><span>${lock?'Locked':'Best '+(sv.hs[i]||0)}</span></button>`;
+            }
+            h+=`</div><button class="btn" onclick="start(-1)">∞ Endless · Best ${sv.hs[-1]||0}</button>`;
+            $('menu').innerHTML=h;show('menu');
+          }
+
+          function start(m){
+            mode=m;p={y:G-PH,vy:0};objs=[];bullets=[];spawnT=50;cd=0;t=0;pts=0;groundX=0;
+            scene='play';show(null);hero.style.visibility='visible';
+            try{screen.orientation.lock('landscape').catch(()=>{})}catch(e){}
+          }
+
+          function finish(win){
+            scene='end';const s=score();
+            if(s>(sv.hs[mode]||0))sv.hs[mode]=s;
+            if(win&&mode+2>sv.un)sv.un=mode+2;
+            save();
+            const title=win?'Level '+(mode+1)+' complete!':(mode<0?'Run over':'Heart attack!');
+            let h=`<h2>${title}</h2>`;
+            if(win&&mode===9)h+='<div class="banner">★ ALL LEVELS COMPLETED! ★</div>';
+            h+=`<div class="sub">Score ${s} · Best ${sv.hs[mode]}</div><div class="row">`;
+            h+=`<button class="btn" onclick="start(${mode})">Retry</button>`;
+            if(win&&mode<9)h+=`<button class="btn" onclick="start(${mode+1})">Next level</button>`;
+            h+=`<button class="btn" onclick="menu()">Menu</button></div>`;
+            $('end').innerHTML=h;show('end');
+          }
+
+          function jump(){if(scene==='play'&&p.y>=G-PH-1)p.vy=-15.5}
+          function fire(){bullets.push({x:PX+PW,y:p.y+PH/2,r:7});cd=12}
+
+          addEventListener('keydown',e=>{
+            if(e.code==='Space'){e.preventDefault();kb=true}
+            else if(e.code==='ArrowUp'||e.code==='KeyW'){e.preventDefault();jump()}
+            else if(e.code==='Escape'&&scene==='play')menu();
+          });
+          addEventListener('keyup',e=>{if(e.code==='Space')kb=false});
+          const hold=(id,on,off)=>{const b=$(id);b.addEventListener('pointerdown',e=>{e.preventDefault();on()});['pointerup','pointercancel','pointerleave'].forEach(n=>b.addEventListener(n,off))};
+          hold('jumpBtn',jump,()=>{});
+          hold('shootBtn',()=>{held=true},()=>{held=false});
+
+          function update(){
+            t++;
+            const L=mode<0?{speed:Math.min(5+t/500,12),gap:Math.max(50,100-t/60),hp:Math.min(4,1+(t/1500|0)),big:.5}:LV[mode];
+            const sp=L.speed;
+            groundX=(groundX+sp)%40;
+            p.vy+=0.75;p.y+=p.vy;if(p.y>G-PH){p.y=G-PH;p.vy=0}
+            if(cd>0)cd--;
+            if((held||kb)&&cd<=0)fire();
+            if(--spawnT<=0){
+              if(Math.random()<L.big)objs.push({k:'h',x:W+20,y:G-92,w:92,h:92,hp:L.hp,wob:Math.random()*6,fl:0});
+              else{const h=40+Math.random()*12;objs.push({k:'r',x:W+20,y:G-h,w:36+Math.random()*26,h,hp:1,fl:0})}
+              spawnT=L.gap+Math.random()*45;
+            }
+            objs.forEach(o=>{o.x-=o.k==='h'?sp*0.9+1:sp;if(o.fl>0)o.fl--});
+            bullets.forEach(b=>b.x+=12);
+            for(const b of bullets)for(const o of objs){
+              if(o.hp>0&&b.x+b.r>o.x&&b.x-b.r<o.x+o.w&&b.y+b.r>o.y&&b.y-b.r<o.y+o.h){
+                b.x=W+99;o.hp--;o.fl=5;if(o.hp<=0)pts+=o.k==='h'?10:3;
+              }
+            }
+            objs=objs.filter(o=>o.hp>0&&o.x>-110);
+            bullets=bullets.filter(b=>b.x<W+20);
+            for(const o of objs){
+              const m=o.k==='h'?8:4;
+              if(PX+8<o.x+o.w-m&&PX+PW-8>o.x+m&&p.y+8<o.y+o.h&&p.y+PH>o.y+m){finish(false);return}
+            }
+            if(mode>=0&&t>=L.goal)finish(true);
+          }
+
+          function drawHeartAttack(o){
+            const w=Math.sin(t/6+o.wob)*2;
+            ctx.save();ctx.translate(o.x,o.y);ctx.scale(o.w/48,o.w/48);
+            if(o.fl>0)ctx.globalAlpha=.55;
+            ctx.fillStyle='#3b0a14';ctx.beginPath();ctx.roundRect(0,w,48,48,12);ctx.fill();
+            ctx.fillStyle='#facc15';ctx.beginPath();
+            ctx.moveTo(28,w+2);ctx.lineTo(12,w+26);ctx.lineTo(22,w+26);ctx.lineTo(16,w+46);ctx.lineTo(36,w+20);ctx.lineTo(26,w+20);ctx.lineTo(34,w+2);ctx.closePath();ctx.fill();
+            ctx.fillStyle='#fff';ctx.fillRect(8,w+10,8,5);ctx.fillRect(32,w+10,8,5);
+            ctx.restore();
+          }
+          function drawRock(o,dark){
+            ctx.globalAlpha=o.fl>0?.55:1;
+            ctx.fillStyle=dark?'#9ca3af':'#6b7280';ctx.beginPath();
+            ctx.moveTo(o.x,G);ctx.lineTo(o.x+o.w*.15,o.y+o.h*.35);ctx.lineTo(o.x+o.w*.4,o.y);ctx.lineTo(o.x+o.w*.8,o.y+o.h*.2);ctx.lineTo(o.x+o.w,G);ctx.closePath();ctx.fill();
+            ctx.fillStyle='rgba(255,255,255,.25)';ctx.fillRect(o.x+o.w*.35,o.y+o.h*.25,o.w*.2,4);
+            ctx.globalAlpha=1;
+          }
+
+          function draw(){
+            const dark=matchMedia('(prefers-color-scheme: dark)').matches;
+            const css=getComputedStyle(document.documentElement);
+            ctx.fillStyle=css.getPropertyValue('--sky');ctx.fillRect(0,0,W,H);
+            ctx.fillStyle=css.getPropertyValue('--ground');ctx.fillRect(0,G,W,H-G);
+            ctx.fillStyle=dark?'#2b1119':'#ffe3e8';
+            for(let x=-(groundX||0);x<W;x+=40)ctx.fillRect(x,G+14,20,4);
+            if(scene==='play'||scene==='end'){
+              bullets.forEach(b=>{ctx.fillStyle='#fb7185';ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,7);ctx.fill()});
+              objs.forEach(o=>o.k==='h'?drawHeartAttack(o):drawRock(o,dark));
+              hero.style.top=(p.y/H*100)+'%';
+              const fg=css.getPropertyValue('--fg');
+              ctx.fillStyle=fg;ctx.font='bold 20px system-ui,sans-serif';
+              ctx.textAlign='left';ctx.fillText('Score '+score(),16,30);
+              ctx.textAlign='right';ctx.fillText('Best '+(sv.hs[mode]||0),W-16,30);
+              ctx.textAlign='center';ctx.fillText(mode<0?'Endless':'Level '+(mode+1),W/2,30);
+              if(mode>=0){ctx.strokeStyle=fg;ctx.strokeRect(W/2-100,40,200,8);ctx.fillStyle='#e11d48';ctx.fillRect(W/2-100,40,200*Math.min(1,t/LV[mode].goal),8)}
+            }
+          }
+          objs=[];bullets=[];
+          (function loop(){
+            if(scene==='play'&&!matchMedia('(orientation: portrait)').matches)update();
+            draw();requestAnimationFrame(loop);
+          })();
+          hero.style.visibility='hidden';
+          </script>
+          </body>
+          </html>
+          EOF
+      - name: Build Android app
+        working-directory: app
+        run: |
+          npm install
           npx cap add android
           sed -i 's|<activity|<activity android:screenOrientation="sensorLandscape"|' android/app/src/main/AndroidManifest.xml
           npx cap sync android
-      - name: Build APK
-        working-directory: android
-        run: ./gradlew assembleDebug
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
       - uses: actions/upload-artifact@v4
         with:
           name: Mr-Heart-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: app/android/app/build/outputs/apk/debug/app-debug.apk
