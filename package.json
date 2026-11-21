@@ -1,0 +1,17 @@
+{
+  "name": "mr-heart",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mr.Heart - an endless-runner game by W!zardG@mers",
+  "scripts": {
+    "assets": "npx @capacitor/assets generate --android",
+    "android:add": "npx cap add android",
+    "sync": "npx cap sync",
+    "android:open": "npx cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/cli": "^6.1.2",
+    "@capacitor/core": "^6.1.2"
+  }
+}
